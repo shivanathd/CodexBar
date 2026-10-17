@@ -923,6 +923,65 @@ extension UserProviderPluginTests {
             .write(to: directory.appendingPathComponent("\(stage)-menus.json"))
     }
 
+    @MainActor
+    @Test
+    func `plugin svg icon is kept and rendered as a template image`() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let svg = #"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2 2h12v12H2z"/></svg>"#
+        _ = try fixture.write(name: "svg.js", source: Self.iconPlugin(id: "svg-meter", svg: svg))
+        let plugin = try #require(UserProviderPluginRegistry.refresh(
+            loader: fixture.loader(transport: RecordingTransport(responseJSON: "{}"))).first?.plugin)
+
+        #expect(plugin.manifest.icon.svg == svg)
+        #expect(plugin.manifest.icon.monogram == "SV")
+        let image = try #require(StatusItemController.userPluginSVGImage(plugin))
+        #expect(image.isTemplate)
+    }
+
+    @Test
+    func `unsafe or oversized svg icons fall back to the monogram`() throws {
+        let open = #"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">"#
+        let rejected = [
+            open + "<script>alert(1)</script></svg>",
+            open + "<style>path{fill:red}</style></svg>",
+            open + "<foreignObject><div/></foreignObject></svg>",
+            open + #"<image href="https://example.com/x.png"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" fill="url(#g)"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" onload="x()"/></svg>"#,
+            #"<!DOCTYPE svg [<!ENTITY x "y">]><svg><path d="&x;"/></svg>"#,
+            #"<g><path d="M0 0h1v1z"/></g>"#,
+            open + #"<path d=""# + String(repeating: "M0 0h1v1z", count: 1000) + #""/></svg>"#,
+            "",
+        ]
+        for svg in rejected {
+            #expect(!ProviderPluginIconSVG.isValid(svg), "accepted: \(svg.prefix(60))")
+        }
+
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        _ = try fixture.write(name: "bad.js", source: Self.iconPlugin(id: "bad-meter", svg: rejected[0]))
+        let plugin = try #require(UserProviderPluginRegistry.refresh(
+            loader: fixture.loader(transport: RecordingTransport(responseJSON: "{}"))).first?.plugin)
+        #expect(plugin.manifest.icon.svg == nil)
+        #expect(plugin.manifest.icon.monogram == "SV")
+    }
+
+    private static func iconPlugin(id: String, svg: String) -> String {
+        // Test SVGs contain no backticks or `${`, so a JS template literal carries them verbatim.
+        let literal = "`" + svg + "`"
+        return """
+        defineProvider({
+          id: "\(id)",
+          name: "SVG Meter",
+          icon: { monogram: "SV", tint: "#0176D3", svg: \(literal) },
+          endpoints: ["https://\(id).example"],
+          settings: [],
+          fetchUsage() { return { primary: { usedPercent: 12 } }; },
+        });
+        """
+    }
+
     private static func menuPlugin(id: String, name: String, topLevel: Bool? = nil) -> String {
         """
         defineProvider({

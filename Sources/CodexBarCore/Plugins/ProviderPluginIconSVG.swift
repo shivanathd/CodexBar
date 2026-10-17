@@ -1,0 +1,82 @@
+import Foundation
+#if canImport(FoundationXML)
+import FoundationXML
+#endif
+
+/// Validates a plugin's monochrome SVG icon. Only plain vector shapes pass: no scripts, styles, links,
+/// raster images, foreign objects, entities, or event handlers. Anything else is rejected so the host
+/// falls back to the monogram.
+public enum ProviderPluginIconSVG {
+    public static let maximumBytes = 8 * 1024
+
+    static let allowedElements: Set<String> = [
+        "svg", "g", "path", "circle", "ellipse", "rect", "line", "polyline", "polygon", "title", "desc",
+    ]
+
+    static let allowedAttributes: Set<String> = [
+        "xmlns", "version", "id", "viewBox", "width", "height", "fill", "fill-rule", "clip-rule", "opacity",
+        "fill-opacity", "transform", "d", "cx", "cy", "r", "rx", "ry", "x", "y", "x1", "y1", "x2", "y2",
+        "points", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin",
+    ]
+
+    public static func isValid(_ svg: String) -> Bool {
+        guard !svg.isEmpty, svg.utf8.count <= self.maximumBytes,
+              svg.range(of: "<!DOCTYPE", options: .caseInsensitive) == nil,
+              svg.range(of: "<!ENTITY", options: .caseInsensitive) == nil,
+              let data = svg.data(using: .utf8)
+        else { return false }
+        let delegate = AllowlistDelegate()
+        let parser = XMLParser(data: data)
+        parser.shouldResolveExternalEntities = false
+        parser.delegate = delegate
+        return parser.parse() && delegate.isValid && delegate.sawRoot
+    }
+
+    private final class AllowlistDelegate: NSObject, XMLParserDelegate {
+        var isValid = true
+        var sawRoot = false
+        private var depth = 0
+
+        func parser(
+            _ parser: XMLParser,
+            didStartElement elementName: String,
+            namespaceURI: String?,
+            qualifiedName qName: String?,
+            attributes attributeDict: [String: String] = [:])
+        {
+            if self.depth == 0 {
+                if elementName == "svg", !self.sawRoot { self.sawRoot = true } else { self.reject(parser) }
+            }
+            self.depth += 1
+            guard ProviderPluginIconSVG.allowedElements.contains(elementName),
+                  attributeDict.keys.allSatisfy({ ProviderPluginIconSVG.allowedAttributes.contains($0) }),
+                  !attributeDict.values.contains(where: { $0.range(of: "url(", options: .caseInsensitive) != nil })
+            else {
+                self.reject(parser)
+                return
+            }
+        }
+
+        func parser(
+            _ parser: XMLParser,
+            didEndElement elementName: String,
+            namespaceURI: String?,
+            qualifiedName qName: String?)
+        {
+            self.depth -= 1
+        }
+
+        func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
+            self.reject(parser)
+        }
+
+        func parser(_ parser: XMLParser, foundProcessingInstructionWithTarget target: String, data: String?) {
+            self.reject(parser)
+        }
+
+        private func reject(_ parser: XMLParser) {
+            self.isValid = false
+            parser.abortParsing()
+        }
+    }
+}
