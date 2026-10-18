@@ -19,6 +19,28 @@ public enum ProviderPluginIconSVG {
         "points", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin",
     ]
 
+    static let svgNamespace = "http://www.w3.org/2000/svg"
+
+    /// Geometry, colours and transforms need only these characters. Excluding `\`, `/`, `:`, `;`, quotes and
+    /// `*` leaves no CSS escape, comment, declaration or URL syntax, so a value cannot reference anything.
+    static let allowedValueCharacters = CharacterSet(
+        charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,#%+-()\t\n\r")
+
+    /// Paint is the only place a function could load an image (`image-set()`, `paint()`, …), so it gets an exact
+    /// grammar: a keyword or colour name, a hex colour, or numeric `rgb()`/`rgba()`.
+    static let paintPattern = #"^(?:[A-Za-z]+|#[0-9A-Fa-f]{3,8}|rgba?\([0-9.%,\s]+\))$"#
+
+    static func isAllowedValue(_ name: String, _ value: String) -> Bool {
+        if name == "xmlns" { return value == self.svgNamespace }
+        if name == "fill" || name == "stroke" {
+            let paint = value.trimmingCharacters(in: .whitespaces)
+            return paint.range(of: self.paintPattern, options: .regularExpression) != nil
+                && paint.range(of: "url", options: .caseInsensitive) == nil
+        }
+        return value.unicodeScalars.allSatisfy { self.allowedValueCharacters.contains($0) }
+            && value.range(of: "url", options: .caseInsensitive) == nil
+    }
+
     public static func isValid(_ svg: String) -> Bool {
         guard !svg.isEmpty, svg.utf8.count <= self.maximumBytes,
               svg.range(of: "<!DOCTYPE", options: .caseInsensitive) == nil,
@@ -49,8 +71,10 @@ public enum ProviderPluginIconSVG {
             }
             self.depth += 1
             guard ProviderPluginIconSVG.allowedElements.contains(elementName),
-                  attributeDict.keys.allSatisfy({ ProviderPluginIconSVG.allowedAttributes.contains($0) }),
-                  !attributeDict.values.contains(where: { $0.range(of: "url(", options: .caseInsensitive) != nil })
+                  attributeDict.allSatisfy({ name, value in
+                      ProviderPluginIconSVG.allowedAttributes.contains(name)
+                          && ProviderPluginIconSVG.isAllowedValue(name, value)
+                  })
             else {
                 self.reject(parser)
                 return

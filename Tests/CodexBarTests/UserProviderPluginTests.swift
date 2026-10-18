@@ -934,6 +934,12 @@ extension UserProviderPluginTests {
             loader: fixture.loader(transport: RecordingTransport(responseJSON: "{}"))).first?.plugin)
 
         #expect(plugin.manifest.icon.svg == svg)
+        let open = #"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">"#
+        for paint in ["none", "currentColor", "black", "#fff", "#336699cc", "rgb(1, 2, 3)", "rgba(0,0,0,50%)"] {
+            let shape = #"<path d="M2 2h12v12H2z" fill=""# + paint + #"" stroke=""# + paint
+                + #"" transform="rotate(45 8 8)"/>"#
+            #expect(ProviderPluginIconSVG.isValid(open + shape + "</svg>"), "rejected: \(paint)")
+        }
         #expect(plugin.manifest.icon.monogram == "SV")
         let image = try #require(StatusItemController.userPluginSVGImage(plugin))
         #expect(image.isTemplate)
@@ -949,6 +955,31 @@ extension UserProviderPluginTests {
             open + #"<image href="https://example.com/x.png"/></svg>"#,
             open + #"<path d="M0 0h1v1z" fill="url(#g)"/></svg>"#,
             open + #"<path d="M0 0h1v1z" onload="x()"/></svg>"#,
+            // CSS escapes, comments and character references cannot smuggle a URL past the check.
+            open + #"<path d="M0 0h1v1z" fill="u\72l(https://example.com/p.svg#x)"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" stroke="U\52L(#g)"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" fill="&#117;rl(#g)"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" fill="red;background:url(x)"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" fill="/**/red"/></svg>"#,
+            #"<svg xmlns="https://example.com/other" viewBox="0 0 16 16"><path d="M0 0h1v1z"/></svg>"#,
+            // Red team: other ways to reference or inject.
+            open + #"<path d="M0 0h1v1z" fill="&#x55;RL(#g)"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" fill="\#u{FF55}\#u{FF52}\#u{FF4C}(#g)"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" fill="url (#g)"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" fill="image-set(&quot;x.png&quot; 1x)"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" style="fill:red"/></svg>"#,
+            open + ##"<use href="#a"/></svg>"##,
+            open + #"<a href="https://example.com"><path d="M0 0h1v1z"/></a></svg>"#,
+            open + #"<path xlink:href="https://example.com/x" d="M0 0h1v1z"/></svg>"#,
+            #"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M0 0h1v1z"/></svg>"#,
+            #"<svg xmlns="http://www.w3.org/2000/svg" xml:base="https://example.com/"><path d="M0 0h1v1z"/></svg>"#,
+            open + #"<path xmlns="https://example.com/other" d="M0 0h1v1z"/></svg>"#,
+            #"<?xml-stylesheet href="https://example.com/s.css"?><svg xmlns="http://www.w3.org/2000/svg"/>"#,
+            open + #"<path d="M0 0h1v1z" fill="red&#59;x"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" fill="image-set(x.png 1x)"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" stroke="paint(x)"/></svg>"#,
+            open + #"<path d="M0 0h1v1z" fill="var(--x)"/></svg>"#,
+            open + "<path d=\"M0 0h1v1z\" fill=\"red\u{0}\"/></svg>",
             #"<!DOCTYPE svg [<!ENTITY x "y">]><svg><path d="&x;"/></svg>"#,
             #"<g><path d="M0 0h1v1z"/></g>"#,
             open + #"<path d=""# + String(repeating: "M0 0h1v1z", count: 1000) + #""/></svg>"#,

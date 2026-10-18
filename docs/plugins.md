@@ -130,7 +130,9 @@ defineProvider({
   letter of `name` with a neutral tint. `svg` (optional) is an inline monochrome SVG string of at most 8 KB, drawn as a
   template image like built-in provider icons. Only `svg`, `g`, `path`, `circle`, `ellipse`, `rect`, `line`, `polyline`,
   `polygon`, `title`, and `desc` elements with plain geometry/fill/stroke attributes are accepted: no scripts, styles,
-  links, `url(...)` references, raster images, `foreignObject`, or DOCTYPE/entities. An SVG that fails these checks is
+  links, `url(...)` references, raster images, `foreignObject`, or DOCTYPE/entities. Attribute values may use only
+  letters, digits, spaces and `.,#%+-()` (no CSS escapes, comments or declarations); `fill`/`stroke` must be a colour
+  keyword, `#hex`, or numeric `rgb()`/`rgba()`; `xmlns` must be the SVG namespace. An SVG that fails these checks is
   ignored and the monogram is shown. File icons are not supported.
 - `topLevel` (optional, default `true`): gives an enabled plugin its own provider-switcher tab when Merge Icons is on. Set to `false` to keep an appended card.
   Plugin tabs show a quota gauge from the most constrained reported seven-day window, otherwise the first available
