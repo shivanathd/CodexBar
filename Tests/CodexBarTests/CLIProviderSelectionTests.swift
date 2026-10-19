@@ -44,6 +44,7 @@ struct CLIProviderSelectionTests {
             "|parallel|",
             "|claudeplatform|",
             "|munito|",
+            "|agentforce|",
             "|both|",
             "|all]",
         ]

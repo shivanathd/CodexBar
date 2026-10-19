@@ -248,6 +248,7 @@ struct SettingsStoreAdditionalTests {
             .linkup: [.automatic],
             .tinyapi: [.automatic],
             .exa: [.automatic],
+            .agentforce: [.automatic],
             .workbuddy: [.automatic, .primary],
             .aerostack: [.automatic, .primary],
             .sailresearch: [.automatic],

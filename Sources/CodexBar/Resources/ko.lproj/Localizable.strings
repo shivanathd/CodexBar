@@ -2668,3 +2668,13 @@
 "Leave blank to keep the saved credential." = "저장된 인증 정보를 유지하려면 비워 두세요.";
 
 "No personal budget configured" = "개인 예산이 설정되지 않았습니다";
+
+/* Agentforce provider settings */
+"My Domain URL" = "My Domain URL 주소";
+"Your production org's My Domain, like https://acme.my.salesforce.com. Sandboxes are not supported." = "프로덕션 조직의 My Domain입니다(예: https://acme.my.salesforce.com). Sandbox는 지원되지 않습니다.";
+"https://acme.my.salesforce.com" = "https://acme.my.salesforce.com";
+"Flex Credits" = "Flex Credits";
+"Data Services Credits" = "Data Services Credits";
+"Agentforce reports Digital Wallet consumption, not local token cost history." = "Agentforce는 Digital Wallet 소비량을 보고하며, 로컬 토큰 비용 기록은 아닙니다.";
+"Paste the Cookie header from a request to your My Domain host. It must contain sid." = "My Domain 호스트로 보낸 요청의 쿠키 헤더를 붙여넣으세요. sid가 포함되어야 합니다.";
+"Cookie: sid=…" = "Cookie: sid=…";

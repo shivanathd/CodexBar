@@ -645,6 +645,14 @@ These plugins omit undocumented reset dates, credit-bucket splits, and live requ
 with a bearer key that holds Read account data permission. The organization read is best-effort; missing or zero
 limits keep the spend rows without a percentage window, and no reset time is guessed.
 
+## Consumption providers
+
+[Agentforce](agentforce.md) reads this month's Digital Wallet consumption per card from a production Salesforce org.
+Swift validates the production My Domain host and maps the plugin's one logical cookie domain to it, importing only
+the `sid` cookie for that host; the plugin sends it only to that host as a bearer token. `persistent-storage` holds the
+organization ID per host and the last good result, which throttles refreshes to at most one Data 360 query per hour
+and keeps stale values visible after a failure. Cards are never summed and no capacity or percentage is inferred.
+
 ## Generative media credit providers
 
 [fal](fal.md) reads the account credit balance from the Platform API billing endpoint with a `Key`-scheme API key

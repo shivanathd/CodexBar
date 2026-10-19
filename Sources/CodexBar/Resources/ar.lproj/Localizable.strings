@@ -2704,3 +2704,13 @@
 "Leave blank to keep the saved credential." = "اتركه فارغًا للاحتفاظ ببيانات الاعتماد المحفوظة.";
 
 "No personal budget configured" = "لم يتم إعداد ميزانية شخصية";
+
+/* Agentforce provider settings */
+"My Domain URL" = "عنوان URL لـ My Domain";
+"Your production org's My Domain, like https://acme.my.salesforce.com. Sandboxes are not supported." = "My Domain الخاص بمؤسسة الإنتاج، مثل https://acme.my.salesforce.com. لا يتم دعم بيئات Sandbox.";
+"https://acme.my.salesforce.com" = "https://acme.my.salesforce.com";
+"Flex Credits" = "Flex Credits";
+"Data Services Credits" = "Data Services Credits";
+"Agentforce reports Digital Wallet consumption, not local token cost history." = "تُبلغ Agentforce عن الاستهلاك من Digital Wallet، لا عن سجل تكاليف الرموز المحلي.";
+"Paste the Cookie header from a request to your My Domain host. It must contain sid." = "الصق رأس Cookie من طلب إلى مضيف My Domain الخاص بك. يجب أن يحتوي على sid.";
+"Cookie: sid=…" = "Cookie: sid=…";

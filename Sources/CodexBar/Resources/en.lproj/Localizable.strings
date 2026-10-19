@@ -2705,3 +2705,13 @@
 "Leave blank to keep the saved credential." = "Leave blank to keep the saved credential.";
 
 "No personal budget configured" = "No personal budget configured";
+
+/* Agentforce provider settings */
+"My Domain URL" = "My Domain URL";
+"Your production org's My Domain, like https://acme.my.salesforce.com. Sandboxes are not supported." = "Your production org's My Domain, like https://acme.my.salesforce.com. Sandboxes are not supported.";
+"https://acme.my.salesforce.com" = "https://acme.my.salesforce.com";
+"Flex Credits" = "Flex Credits";
+"Data Services Credits" = "Data Services Credits";
+"Agentforce reports Digital Wallet consumption, not local token cost history." = "Agentforce reports Digital Wallet consumption, not local token cost history.";
+"Paste the Cookie header from a request to your My Domain host. It must contain sid." = "Paste the Cookie header from a request to your My Domain host. It must contain sid.";
+"Cookie: sid=…" = "Cookie: sid=…";

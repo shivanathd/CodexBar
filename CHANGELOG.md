@@ -2,6 +2,10 @@
 
 ## 0.78.1 — Unreleased
 
+### Added
+
+- Providers: add Agentforce month-to-date Digital Wallet consumption (Flex Credits, Data Services Credits, and other cards) from a production Salesforce org through a bundled plugin, using the browser `sid` session for a configured My Domain host and refreshing at most hourly because each Data 360 query may consume credits.
+
 ### Fixed
 
 - Codex: stop hidden OpenAI dashboard pages at the refresh deadline, including stalled page preparation and JavaScript, while retaining verified API usage (#4641, #4642, #4645). Thanks @mchami02 and @enzonaute!

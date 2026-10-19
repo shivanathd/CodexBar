@@ -10,7 +10,7 @@ struct PluginCookieProviderSpecTests {
     func `automatic cookie guidance names the provider browser policy and manual alternative`() throws {
         let fixture = try ProviderSettingsDescriptorTests().makeSettingsFixture(suite: #function)
         fixture.settings.debugDisableKeychainAccess = false
-        for provider in [UsageProvider.museai, .raycast, .perplexity, .parallel] {
+        for provider in [UsageProvider.museai, .raycast, .perplexity, .parallel, .agentforce] {
             let implementation = try #require(ProviderCatalog.implementation(for: provider))
             let picker = try #require(implementation.settingsPickers(
                 context: fixture.settingsContext(provider: provider)).first)
@@ -22,6 +22,53 @@ struct PluginCookieProviderSpecTests {
                 #expect(picker.subtitle.hasPrefix("Automatic imports browser cookies."))
                 for name in ["Aside", "Opera", "Opera Neon"] {
                     #expect(browsers.map(\.displayName).contains(name))
+                }
+            }
+        }
+    }
+
+    @Test
+    func `Agentforce stores its My Domain URL as the endpoint and requires a production host`() throws {
+        let fixture = try ProviderSettingsDescriptorTests().makeSettingsFixture(suite: #function)
+        let implementation = try #require(ProviderCatalog.implementation(for: .agentforce))
+        let fields = implementation.settingsFields(context: fixture.settingsContext(provider: .agentforce))
+        #expect(fields.map(\.id) == ["agentforce-my-domain-url", "agentforce-cookie-header"])
+        #expect(fields.map(\.kind) == [.plain, .secure])
+        fields[0].binding.wrappedValue = "https://acme.my.salesforce.com"
+        #expect(fixture.settings.providerConfig(for: .agentforce)?.enterpriseHost == "https://acme.my.salesforce.com")
+        let available = { (value: String) in
+            implementation.isAvailable(context: .init(
+                provider: .agentforce,
+                settings: fixture.settings,
+                environment: [AgentforceProviderDescriptor.myDomainKey: value]))
+        }
+        #expect(available("https://acme.my.salesforce.com"))
+        #expect(!available("https://acme--uat.sandbox.my.salesforce.com"))
+        #expect(!available(""))
+    }
+
+    @Test
+    func `Agentforce clears its cached session when the My Domain host changes`() throws {
+        let fixture = try ProviderSettingsDescriptorTests().makeSettingsFixture(suite: #function)
+        let implementation = try #require(ProviderCatalog.implementation(for: .agentforce))
+        let field = try #require(implementation.settingsFields(
+            context: fixture.settingsContext(provider: .agentforce)).first)
+        let storage = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: storage) }
+        try KeychainCacheStore.withServiceOverrideForTesting("agentforce-host-change-\(UUID().uuidString)") {
+            try KeychainCacheStore.withImplicitTestStoreForTesting {
+                try CookieHeaderCache.withLegacyBaseURLOverrideForTesting(storage) {
+                    field.binding.wrappedValue = "https://acme.my.salesforce.com"
+                    CookieHeaderCache.store(
+                        provider: .agentforce,
+                        cookieHeader: "sid=fixture-sid",
+                        sourceLabel: "Chrome / acme.my.salesforce.com")
+                    field.binding.wrappedValue = "https://ACME.my.salesforce.com/"
+                    #expect(CookieHeaderCache.load(provider: .agentforce)?.cookieHeader == "sid=fixture-sid")
+                    field.binding.wrappedValue = "https://other.my.salesforce.com"
+                    #expect(CookieHeaderCache.load(provider: .agentforce) == nil)
+                    #expect(fixture.settings.providerConfig(for: .agentforce)?.enterpriseHost
+                        == "https://other.my.salesforce.com")
                 }
             }
         }
