@@ -165,7 +165,6 @@ extension StatusItemController {
 
     func userPluginSwitcherIcon(for plugin: UserProviderPlugin) -> NSImage {
         if let image = Self.userPluginSVGImage(plugin) {
-            image.size = NSSize(width: 16, height: 16)
             return image
         }
         let size = NSSize(width: 16, height: 16)
@@ -195,7 +194,41 @@ extension StatusItemController {
 
     /// The plugin's validated SVG as a template image, or nil when it has none or it does not decode.
     static func userPluginSVGImage(_ plugin: UserProviderPlugin) -> NSImage? {
-        guard let svg = plugin.manifest.icon.svg, let image = NSImage(data: Data(svg.utf8)) else { return nil }
+        guard let svg = plugin.manifest.icon.svg,
+              let source = NSImage(data: Data(svg.utf8)),
+              source.size.width.isFinite, source.size.height.isFinite,
+              source.size.width > 0, source.size.height > 0,
+              source.size.width <= CGFloat(ProviderPluginIconSVG.maximumCanvasDimension),
+              source.size.height <= CGFloat(ProviderPluginIconSVG.maximumCanvasDimension),
+              let bitmap = NSBitmapImageRep(
+                  bitmapDataPlanes: nil,
+                  pixelsWide: 32,
+                  pixelsHigh: 32,
+                  bitsPerSample: 8,
+                  samplesPerPixel: 4,
+                  hasAlpha: true,
+                  isPlanar: false,
+                  colorSpaceName: .deviceRGB,
+                  bytesPerRow: 0,
+                  bitsPerPixel: 0),
+              let context = NSGraphicsContext(bitmapImageRep: bitmap)
+        else { return nil }
+        let scale = 32 / max(source.size.width, source.size.height)
+        guard scale.isFinite else { return nil }
+        source.size = NSSize(width: source.size.width * scale, height: source.size.height * scale)
+        let rect = NSRect(
+            x: (32 - source.size.width) / 2,
+            y: (32 - source.size.height) / 2,
+            width: source.size.width,
+            height: source.size.height)
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = context
+        context.cgContext.clear(NSRect(x: 0, y: 0, width: 32, height: 32))
+        source.draw(in: rect)
+        bitmap.size = NSSize(width: 16, height: 16)
+        let image = NSImage(size: bitmap.size)
+        image.addRepresentation(bitmap)
         image.isTemplate = true
         return image
     }

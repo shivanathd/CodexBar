@@ -133,7 +133,10 @@ defineProvider({
   links, `url(...)` references, raster images, `foreignObject`, or DOCTYPE/entities. Attribute values may use only
   letters, digits, spaces and `.,#%+-()` (no CSS escapes, comments or declarations); `fill`/`stroke` must be a colour
   keyword, `#hex`, or numeric `rgb()`/`rgba()`; `xmlns` must be the SVG namespace. An SVG that fails these checks is
-  ignored and the monogram is shown. File icons are not supported.
+  ignored and the monogram is shown. The host rasterizes accepted icons into a 32×32 bitmap before display;
+  canvas sizes are checked before native decoding and limited to 4096×4096. Include a finite `viewBox` or paired
+  positive `width`/`height` (numbers or `px`); partial dimensions and other canvas units fall back to the monogram.
+  File icons are not supported.
 - `topLevel` (optional, default `true`): gives an enabled plugin its own provider-switcher tab when Merge Icons is on. Set to `false` to keep an appended card.
   Plugin tabs show a quota gauge from the most constrained reported seven-day window, otherwise the first available
   primary, secondary, tertiary, or extra window. They follow the used/remaining display preference; unknown usage

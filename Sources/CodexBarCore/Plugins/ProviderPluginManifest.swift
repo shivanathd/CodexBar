@@ -28,7 +28,7 @@ public struct ProviderPluginIcon: Equatable, Sendable {
     public init(monogram: String, tint: String, svg: String? = nil) {
         self.monogram = monogram
         self.tint = tint
-        self.svg = svg
+        self.svg = svg.flatMap { ProviderPluginIconSVG.isValid($0) ? $0 : nil }
     }
 }
 
@@ -425,7 +425,6 @@ public struct ProviderPluginManifest: Sendable {
         }
         // An SVG that fails validation is dropped rather than failing the plugin: the monogram is the fallback.
         let svg = try Self.optionalString(value, property: "svg")
-            .flatMap { ProviderPluginIconSVG.isValid($0) ? $0 : nil }
         return ProviderPluginIcon(monogram: monogram, tint: tint.uppercased(), svg: svg)
     }
 

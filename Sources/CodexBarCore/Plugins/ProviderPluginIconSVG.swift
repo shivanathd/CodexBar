@@ -8,6 +8,7 @@ import FoundationXML
 /// falls back to the monogram.
 public enum ProviderPluginIconSVG {
     public static let maximumBytes = 8 * 1024
+    public static let maximumCanvasDimension = 4096.0
 
     static let allowedElements: Set<String> = [
         "svg", "g", "path", "circle", "ellipse", "rect", "line", "polyline", "polygon", "title", "desc",
@@ -41,6 +42,24 @@ public enum ProviderPluginIconSVG {
             && value.range(of: "url", options: .caseInsensitive) == nil
     }
 
+    private static func hasBoundedCanvas(_ attributes: [String: String]) -> Bool {
+        // Paired dimensions prevent one length plus an extreme aspect ratio from implying a huge canvas.
+        guard (attributes["width"] == nil) == (attributes["height"] == nil) else { return false }
+        for key in ["width", "height"] {
+            guard let value = attributes[key] else { continue }
+            let number = value.lowercased().hasSuffix("px") ? String(value.dropLast(2)) : value
+            guard let length = Double(number.trimmingCharacters(in: .whitespacesAndNewlines)),
+                  length.isFinite, length > 0, length <= self.maximumCanvasDimension
+            else { return false }
+        }
+        guard let viewBox = attributes["viewBox"] else { return attributes["width"] != nil }
+        let fields = viewBox.split { $0.isWhitespace || $0 == "," }
+        let numbers = fields.compactMap { Double($0) }
+        return fields.count == 4 && numbers.count == 4 && numbers.allSatisfy(\.isFinite)
+            && numbers[2] > 0 && numbers[2] <= self.maximumCanvasDimension
+            && numbers[3] > 0 && numbers[3] <= self.maximumCanvasDimension
+    }
+
     public static func isValid(_ svg: String) -> Bool {
         guard !svg.isEmpty, svg.utf8.count <= self.maximumBytes,
               svg.range(of: "<!DOCTYPE", options: .caseInsensitive) == nil,
@@ -71,6 +90,7 @@ public enum ProviderPluginIconSVG {
             }
             self.depth += 1
             guard ProviderPluginIconSVG.allowedElements.contains(elementName),
+                  elementName != "svg" || ProviderPluginIconSVG.hasBoundedCanvas(attributeDict),
                   attributeDict.allSatisfy({ name, value in
                       ProviderPluginIconSVG.allowedAttributes.contains(name)
                           && ProviderPluginIconSVG.isAllowedValue(name, value)

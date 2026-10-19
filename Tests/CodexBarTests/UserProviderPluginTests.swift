@@ -928,7 +928,10 @@ extension UserProviderPluginTests {
     func `plugin svg icon is kept and rendered as a template image`() throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
-        let svg = #"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2 2h12v12H2z"/></svg>"#
+        let svg = #"""
+        <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 16 16">
+        <path d="M2 2h12v12H2z"/></svg>
+        """#
         _ = try fixture.write(name: "svg.js", source: Self.iconPlugin(id: "svg-meter", svg: svg))
         let plugin = try #require(UserProviderPluginRegistry.refresh(
             loader: fixture.loader(transport: RecordingTransport(responseJSON: "{}"))).first?.plugin)
@@ -943,12 +946,22 @@ extension UserProviderPluginTests {
         #expect(plugin.manifest.icon.monogram == "SV")
         let image = try #require(StatusItemController.userPluginSVGImage(plugin))
         #expect(image.isTemplate)
+        #expect(image.size == NSSize(width: 16, height: 16))
+        let bitmap = try #require(image.representations.first as? NSBitmapImageRep)
+        #expect(bitmap.pixelsWide == 32)
+        #expect(bitmap.pixelsHigh == 32)
+        #expect(image.representations.count == 1)
+        let center = try #require(bitmap.colorAt(x: 16, y: 16))
+        #expect(center.alphaComponent > 0.9)
     }
 
     @Test
     func `unsafe or oversized svg icons fall back to the monogram`() throws {
         let open = #"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">"#
         let rejected = [
+            #"<svg width="1000000000" height="16"><path d="M0 0h1v1z"/></svg>"#,
+            #"<svg viewBox="0 0 1e100 16"><path d="M0 0h1v1z"/></svg>"#,
+            #"<svg width="16" viewBox="0 0 16 1e-99"><path d="M0 0h1v1z"/></svg>"#,
             open + "<script>alert(1)</script></svg>",
             open + "<style>path{fill:red}</style></svg>",
             open + "<foreignObject><div/></foreignObject></svg>",
@@ -996,6 +1009,7 @@ extension UserProviderPluginTests {
             loader: fixture.loader(transport: RecordingTransport(responseJSON: "{}"))).first?.plugin)
         #expect(plugin.manifest.icon.svg == nil)
         #expect(plugin.manifest.icon.monogram == "SV")
+        #expect(ProviderPluginIcon(monogram: "SV", tint: "#336699", svg: rejected[0]).svg == nil)
     }
 
     private static func iconPlugin(id: String, svg: String) -> String {
