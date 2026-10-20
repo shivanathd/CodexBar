@@ -712,19 +712,5 @@
     "strategies": ["munito.js"],
     "supportsTokenCost": false,
     "workspaceOrder": null
-  },
-  {
-    "availability": [false, false, false],
-    "cliResolution": {"AGENTFORCE": ["agentforce"]},
-    "enterpriseHost": true,
-    "environmentAvailability": [[false, true], [false, true], [false, true], [false, true]],
-    "fields": ["plain", "secure"],
-    "id": "agentforce",
-    "projectToken": "",
-    "projections": {"AGENTFORCE_MY_DOMAIN_URL": "https://fixture.example.com"},
-    "sourceModes": ["auto", "web"],
-    "strategies": ["agentforce.web"],
-    "supportsTokenCost": false,
-    "workspaceOrder": null
   }
 ]
