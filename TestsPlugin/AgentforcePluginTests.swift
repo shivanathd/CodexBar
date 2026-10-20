@@ -633,7 +633,7 @@ struct AgentforcePluginTests {
         init(
             userinfo: Reply = (200, AgentforcePluginTests.userinfo),
             organization: Reply = (200, AgentforcePluginTests.production),
-            query: Reply = (200, AgentforcePluginTests.consumption),
+            query: Reply = (201, AgentforcePluginTests.consumption),
             override: @escaping @Sendable (URLRequest) -> Reply? = { _ in nil })
         {
             self.userinfo = userinfo

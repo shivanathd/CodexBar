@@ -96,7 +96,8 @@ defineProvider({
       const signIn = `Sign in to ${host} in your browser, then refresh.`;
       const unauthorized = Symbol("unauthorized");
       const classify = (response, query) => {
-        if (response.status === 200) return;
+        // query-sql answers 201 Created; any 2xx is success.
+        if (response.status >= 200 && response.status < 300) return;
         // Error bodies are matched for Salesforce error codes only and never echoed.
         const body = response.bodyText;
         if (response.status === 401 || body.includes("INVALID_SESSION_ID")) return unauthorized;
@@ -194,7 +195,8 @@ defineProvider({
           headers,
           timeoutSeconds: 45,
         });
-        if (response.status === 200 || response.status >= 500) write("queryAttempt", { host, at: nowMs });
+        if ((response.status >= 200 && response.status < 300) || response.status >= 500)
+          write("queryAttempt", { host, at: nowMs });
         if (classify(response, true) === unauthorized) return unauthorized;
         const root = json(response, "Data 360 query");
         const unusable = (detail) => {

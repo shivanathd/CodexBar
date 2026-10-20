@@ -98,4 +98,5 @@ were made: the fill is `currentColor` and the viewBox is padded; the paths are u
 are trademarks of Salesforce, Inc.
 
 Tests use fictitious org IDs and synthetic values on QuickJS and JavaScriptCore with stubbed transports and cookie
-sessions. No live Salesforce org was queried during implementation.
+sessions. The browser-session path was also run against a production org, and its per-card totals matched an
+independent read of the same data lake object over the same window.
