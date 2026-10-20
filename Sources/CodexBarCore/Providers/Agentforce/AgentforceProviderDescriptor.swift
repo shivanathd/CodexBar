@@ -120,8 +120,10 @@ public enum AgentforceMyDomain {
               url.port == nil, url.query == nil, url.fragment == nil, url.user == nil, url.password == nil,
               url.path.isEmpty || url.path == "/",
               let host = url.host?.lowercased(),
-              host.split(separator: ".", omittingEmptySubsequences: false).count == 4,
-              !Self.rejectedSuffixes.contains(where: { host == $0 || host.hasSuffix(".\($0)") })
+              host
+                  .range(of: #"^[a-z0-9]([a-z0-9-]*[a-z0-9])?\.my\.salesforce\.com$"#, options: .regularExpression) !=
+                  nil,
+                  !Self.rejectedSuffixes.contains(where: { host == $0 || host.hasSuffix(".\($0)") })
         else { return nil }
         return host
     }

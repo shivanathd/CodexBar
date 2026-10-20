@@ -48,7 +48,7 @@ struct PluginCookieProviderSpecTests {
     }
 
     @Test
-    func `Agentforce clears its cached session when the My Domain host changes`() throws {
+    func `Agentforce clears its cached and pasted sessions when the My Domain host changes`() throws {
         let fixture = try ProviderSettingsDescriptorTests().makeSettingsFixture(suite: #function)
         let implementation = try #require(ProviderCatalog.implementation(for: .agentforce))
         let field = try #require(implementation.settingsFields(
@@ -59,14 +59,18 @@ struct PluginCookieProviderSpecTests {
             try KeychainCacheStore.withImplicitTestStoreForTesting {
                 try CookieHeaderCache.withLegacyBaseURLOverrideForTesting(storage) {
                     field.binding.wrappedValue = "https://acme.my.salesforce.com"
+                    fixture.settings[providerConfig: .agentforce, field: .cookieHeader] = "sid=manual-sid"
                     CookieHeaderCache.store(
                         provider: .agentforce,
                         cookieHeader: "sid=fixture-sid",
                         sourceLabel: "Chrome / acme.my.salesforce.com")
                     field.binding.wrappedValue = "https://ACME.my.salesforce.com/"
                     #expect(CookieHeaderCache.load(provider: .agentforce)?.cookieHeader == "sid=fixture-sid")
+                    #expect(fixture.settings[providerConfig: .agentforce, field: .cookieHeader] == "sid=manual-sid")
+                    // A pasted sid belongs to the previous org too; it must never reach the new host.
                     field.binding.wrappedValue = "https://other.my.salesforce.com"
                     #expect(CookieHeaderCache.load(provider: .agentforce) == nil)
+                    #expect(fixture.settings[providerConfig: .agentforce, field: .cookieHeader].isEmpty)
                     #expect(fixture.settings.providerConfig(for: .agentforce)?.enterpriseHost
                         == "https://other.my.salesforce.com")
                 }

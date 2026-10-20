@@ -293,6 +293,92 @@ struct AgentforcePluginTests {
     }
 
     @Test(arguments: BundledPluginTestSupport.engines)
+    func `a query that times out after dispatch is not retried within the hour`(
+        engine: ProviderPluginEngineKind) async
+    {
+        let storage = Self.storageDirectory()
+        do {
+            _ = try await Self.fetch(engine: engine, stub: Stub(queryError: URLError(.timedOut)), storage: storage)
+            Issue.record("A timed-out query must fail")
+        } catch {}
+
+        // The request may have reached Salesforce and consumed credits, so the hour still applies.
+        let soon = Stub()
+        await Self.expectFailure(
+            engine: engine, stub: soon, storage: storage, now: Self.now.addingTimeInterval(30 * 60),
+            kind: .providerUnavailable)
+        #expect(!soon.recorded.contains { $0.url?.path == "/services/data/v65.0/ssot/query-sql" })
+    }
+
+    @Test(arguments: BundledPluginTestSupport.engines)
+    func `a query that never left the Mac does not hold the hour`(engine: ProviderPluginEngineKind) async throws {
+        for error in [URLError(.cannotFindHost), URLError(.notConnectedToInternet)] {
+            let storage = Self.storageDirectory()
+            do {
+                _ = try await Self.fetch(engine: engine, stub: Stub(queryError: error), storage: storage)
+                Issue.record("An unreachable host must fail")
+            } catch {}
+            let retried = Stub()
+            _ = try await Self.fetch(
+                engine: engine, stub: retried, storage: storage, now: Self.now.addingTimeInterval(60))
+            #expect(retried.recorded.map { $0.url?.path } == ["/services/data/v65.0/ssot/query-sql"])
+        }
+    }
+
+    @Test(arguments: BundledPluginTestSupport.engines)
+    func `a request timeout status still holds the hour`(engine: ProviderPluginEngineKind) async {
+        let storage = Self.storageDirectory()
+        await Self.expectFailure(
+            engine: engine, stub: Stub(query: (408, "private-response")), storage: storage, kind: .apiFailure)
+        let soon = Stub()
+        await Self.expectFailure(
+            engine: engine, stub: soon, storage: storage, now: Self.now.addingTimeInterval(30 * 60),
+            kind: .providerUnavailable)
+        #expect(!soon.recorded.contains { $0.url?.path == "/services/data/v65.0/ssot/query-sql" })
+    }
+
+    @Test(arguments: BundledPluginTestSupport.engines)
+    func `a pasted session used on one host is never sent to another`(engine: ProviderPluginEngineKind) async throws {
+        let storage = Self.storageDirectory()
+        let pasted = { (sid: String) in
+            Sessions([ProviderPluginCookieSession(
+                header: "sid=\(sid)", source: "manual", origin: "https://my.salesforce.com")])
+        }
+        _ = try await Self.fetch(
+            engine: engine, stub: Stub(), storage: storage, sessions: pasted("pasted-sid"), cookieSource: .manual)
+
+        // The host changed outside the settings field (config file, CLI) and the old header is still configured.
+        let other = Stub()
+        await Self.expectFailure(
+            engine: engine, stub: other, storage: storage, myDomain: "https://other.my.salesforce.com",
+            sessions: pasted("pasted-sid"), cookieSource: .manual, kind: .missingCredential)
+        { message in
+            #expect(message.contains("acme.my.salesforce.com"))
+            #expect(!message.contains("pasted-sid"))
+        }
+        #expect(other.recorded.isEmpty)
+
+        // A session that was sent but whose fetch failed for another reason is bound to its host as well.
+        let firstRun = Self.storageDirectory()
+        await Self.expectFailure(
+            engine: engine,
+            stub: Stub(query: (403, #"[{"errorCode":"INSUFFICIENT_ACCESS"}]"#)),
+            storage: firstRun, sessions: pasted("first-sid"), cookieSource: .manual, kind: .permissionDenied)
+        let moved = Stub()
+        await Self.expectFailure(
+            engine: engine, stub: moved, storage: firstRun, myDomain: "https://other.my.salesforce.com",
+            sessions: pasted("first-sid"), cookieSource: .manual, kind: .missingCredential)
+        #expect(moved.recorded.isEmpty)
+
+        // A session pasted for the new host is used normally.
+        let fresh = Stub()
+        _ = try await Self.fetch(
+            engine: engine, stub: fresh, storage: storage, myDomain: "https://other.my.salesforce.com",
+            sessions: pasted("other-sid"), cookieSource: .manual)
+        #expect(fresh.recorded.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer other-sid" })
+    }
+
+    @Test(arguments: BundledPluginTestSupport.engines)
     func `a query that ran but failed is not retried within the hour`(engine: ProviderPluginEngineKind) async {
         let storage = Self.storageDirectory()
         let truncated = Self.consumption.replacingOccurrences(of: #""rowCount":4"#, with: #""rowCount":5"#)
@@ -473,7 +559,7 @@ struct AgentforcePluginTests {
         for value in [
             nil, "", "acme.my.salesforce.com", "http://acme.my.salesforce.com",
             "https://acme.my.salesforce.com.evil.com", "https://evilmy.salesforce.com",
-            "https://user@acme.my.salesforce.com", "https://user:pass@acme.my.salesforce.com",
+            "https://user@acme.my.salesforce.com", "https://.my.salesforce.com", "https://acme.my.salesforce.com.", ["https://user", "pass@acme.my.salesforce.com"].joined(separator: ":"),
             "https://acme.my.salesforce.com:8443", "https://acme.my.salesforce.com/services",
             "https://acme.my.salesforce.com?x=1", "https://acme.my.salesforce.com#x",
             "https://my.salesforce.com", "https://acme--uat.sandbox.my.salesforce.com",
@@ -629,16 +715,19 @@ struct AgentforcePluginTests {
         private let userinfo: Reply
         private let organization: Reply
         private let query: Reply
+        private let queryError: (any Error)?
 
         init(
             userinfo: Reply = (200, AgentforcePluginTests.userinfo),
             organization: Reply = (200, AgentforcePluginTests.production),
             query: Reply = (201, AgentforcePluginTests.consumption),
+            queryError: (any Error)? = nil,
             override: @escaping @Sendable (URLRequest) -> Reply? = { _ in nil })
         {
             self.userinfo = userinfo
             self.organization = organization
             self.query = query
+            self.queryError = queryError
             self.override = override
         }
 
@@ -654,6 +743,7 @@ struct AgentforcePluginTests {
             ProviderHTTPTransportHandler { request in
                 self.lock.withLock { self.requests.append(request) }
                 let path = request.url?.path ?? ""
+                if path.hasSuffix("/query-sql"), let error = self.queryError { throw error }
                 let (status, body) = self.override(request)
                     ?? (path.hasSuffix("/userinfo") ? self.userinfo
                         : path.hasSuffix("/query-sql") ? self.query : self.organization)

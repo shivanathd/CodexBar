@@ -38,7 +38,9 @@ struct AgentforceProviderImplementation: ProviderImplementation {
     @MainActor
     func settingsFields(context: ProviderSettingsContext) -> [ProviderSettingsFieldDescriptor] {
         let endpoint = context.providerConfigBinding(.endpoint)
-        // The cached sid belongs to the previous org; clear it as soon as the host changes.
+        let pasted = context.providerConfigBinding(.cookieHeader)
+        // Cached and pasted sids belong to the previous org; clear both as soon as the host changes, because the
+        // plugin cannot tell which host a pasted header was captured from.
         let myDomain = Binding(
             get: { endpoint.wrappedValue },
             set: { value in
@@ -46,6 +48,7 @@ struct AgentforceProviderImplementation: ProviderImplementation {
                    previous != AgentforceMyDomain.host(value)
                 {
                     _ = CookieHeaderCache.clear(provider: .agentforce)
+                    pasted.wrappedValue = ""
                 }
                 endpoint.wrappedValue = value
             })

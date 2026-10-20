@@ -53,8 +53,10 @@ late, so the current day is usually incomplete.
 
 When Salesforce rejects the session (`401` / `INVALID_SESSION_ID`, or a user info `403` with `Bad_OAuth_Token`,
 `Missing_OAuth_Token`, or `Wrong_Org`), CodexBar discards it and asks you to sign in to your My Domain host in your
-browser, then refresh. Changing the My Domain URL clears the cached session and never reuses a session cached for the
-previous host.
+browser, then refresh. Changing the My Domain URL in Settings clears both the cached and the pasted session, and a
+session cached for the previous host is never reused. A pasted session that has been sent to one host is refused for
+any other host (for example after editing `enterpriseHost` in the config file) until you paste one from the new host;
+CodexBar recognises it by a short one-way fingerprint and never stores the session itself.
 
 ## Requests and cost
 
@@ -67,8 +69,9 @@ Each refresh makes at most three read-only requests to your My Domain host:
 
 The Data 360 query may consume Data Services credits. CodexBar therefore refreshes this provider **at most hourly**:
 within an hour of a successful fetch it shows the saved result without contacting Salesforce, unless a new UTC month
-has started. A query that ran but failed (an unusable result or a server error) is also not retried within the hour;
-a rejected session, permission error, or rate limit never ran the query and does not wait. If a later refresh fails, the last good values stay visible, marked **Stale** with their time and the
+has started. A query that may have run (an unusable result, a server error, a request timeout, or a connection lost
+after sending) is also not retried within the hour. A refused request (a rejected session, permission error, or rate
+limit) or one that never left the Mac (DNS, offline, TLS) does not wait. If a later refresh fails, the last good values stay visible, marked **Stale** with their time and the
 failure, rather than dropping to zero; values from an earlier month are labelled with that month. A refused, truncated, or unfinished query result is treated as a failure.
 
 ## Privacy

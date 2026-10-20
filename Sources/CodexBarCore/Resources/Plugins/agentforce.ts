@@ -38,6 +38,14 @@ defineProvider({
         void error;
       }
     };
+    // FNV-1a lets a pasted sid be recognised after a host change without storing the sid itself.
+    const fingerprint = (value: string): string => {
+      let hash = 0x811c9dc5;
+      for (let index = 0; index < value.length; index++) {
+        hash = Math.imul(hash ^ value.charCodeAt(index), 0x01000193) >>> 0;
+      }
+      return hash.toString(16);
+    };
     const storedState = read("state");
     const state: Stored | undefined =
       storedState &&
@@ -151,7 +159,8 @@ defineProvider({
           "MAX(eventtime__c) AS latest_event FROM TenantEnrichedUsageEvent__dll " +
           `WHERE entitlementorgid__c = '${orgId}' AND eventtime__c >= TIMESTAMP WITH TIME ZONE '${monthStart}' ` +
           "GROUP BY cardname__c";
-        // A query that ran but failed may still have consumed credits, so it is not retried within the hour; a new UTC month starts over.
+        // A query that may have run (a failed result, a server error, or a timeout after dispatch) can still have
+        // consumed credits, so it is not retried within the hour; a new UTC month starts over.
         const attempt = read("queryAttempt");
         const attemptAt = attempt && attempt.host === host ? attempt.at : undefined;
         if (
@@ -165,13 +174,26 @@ defineProvider({
             `The last Data 360 query failed; retrying after ${utc(attemptAt + hourMs)}.`,
           );
         }
-        const response = await ctx.http.post(`${base}/services/data/v65.0/ssot/query-sql`, {
-          body: { sql },
-          headers,
-          timeoutSeconds: 45,
-        });
-        if ((response.status >= 200 && response.status < 300) || response.status >= 500)
-          write("queryAttempt", { host, at: nowMs });
+        // Recorded before dispatch so a timeout or dropped connection still counts as an attempt.
+        write("queryAttempt", { host, at: nowMs });
+        let response: CodexBarHTTPTextResponse;
+        try {
+          response = await ctx.http.post(`${base}/services/data/v65.0/ssot/query-sql`, {
+            body: { sql },
+            headers,
+            timeoutSeconds: 45,
+          });
+        } catch (error) {
+          // These fail before the request is sent, so the query cannot have run.
+          const transport = (error as CodexBarHTTPError).transportClass;
+          if (transport === "dns" || transport === "offline" || transport === "tls") write("queryAttempt", null);
+          throw error;
+        }
+        // A refused request (rejected session, permission error, rate limit) never ran the query; a request timeout
+        // status might have.
+        if (response.status >= 300 && response.status < 500 && response.status !== 408 && response.status !== 425) {
+          write("queryAttempt", null);
+        }
         if (classify(response, true) === unauthorized) return unauthorized;
         const root = json(response, "Data 360 query");
         const unusable = (detail: string): never => {
@@ -252,6 +274,19 @@ defineProvider({
         if (!sid) {
           if (policy === "manual") throw fail("missingCredential", "Paste a Cookie header that contains sid.");
           continue;
+        }
+        if (policy === "manual") {
+          // A pasted header is not bound to a host, so a host changed outside Settings would otherwise carry it.
+          const used = read("manualSession");
+          const usedHost = used && typeof used.host === "string" ? used.host : undefined;
+          if (usedHost && usedHost !== host && used?.fingerprint === fingerprint(sid)) {
+            throw fail(
+              "missingCredential",
+              `The pasted session was captured for ${usedHost}. Paste a Cookie header from ${host}.`,
+            );
+          }
+          // Bound before the first send, so a session whose fetch fails for another reason is bound too.
+          write("manualSession", { host, fingerprint: fingerprint(sid) });
         }
         const usage = await fetchWith(sid);
         if (usage !== unauthorized) return usage;
